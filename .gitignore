@@ -7,8 +7,7 @@ __pycache__/
 .ruff_cache/
 
 # Generated data (always reproducible from config + seed)
-data/*
-!data/.gitkeep
+data/
 *.sqlite
 *.db
 *.parquet
