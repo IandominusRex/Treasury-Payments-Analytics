@@ -16,7 +16,7 @@
 
 
 -- -------------------------------------------------------------------------------------
--- Step 1 ✅ given · Outgoing external payments with the fields the rules need
+-- Step 1 · Outgoing external payments with the fields the rules need
 -- -------------------------------------------------------------------------------------
 WITH pay AS (
     SELECT p.payment_id,
@@ -41,30 +41,7 @@ SELECT * FROM pay LIMIT 20;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 2 ✏️ TODO · One rule at a time, each as a 0/1 column
--- -------------------------------------------------------------------------------------
--- Build them one by one; run each and ask "how many alerts per day would this generate?"
---
---   rule_high_risk   : cpty_country_risk = 'high'
---   rule_round       : amount >= 10000 AND amount % 1000 = 0       (tune the thresholds!)
---   rule_structuring : amount_sgd BETWEEN 0.9 * T AND T   for a reporting threshold T.
---                      Look at a histogram of amount_sgd (GROUP BY CAST(amount_sgd / 500 AS INT))
---                      - a bump just below a round number is the tell.
---   rule_new_bene    : julianday(pay_date) - julianday(first_seen_date) <= 7 AND amount_sgd is high
---                      (high = above that counterparty type's P95; start with a fixed number)
---   rule_duplicate   : another payment with the same counterparty_id and amount within 1 day
---                      -> EXISTS (SELECT 1 FROM pay q WHERE q.counterparty_id = pay.counterparty_id
---                                  AND q.amount = pay.amount AND q.payment_id <> pay.payment_id
---                                  AND ABS(julianday(q.initiated_ts) - julianday(pay.initiated_ts)) <= 1)
---   rule_burst       : counterparty's payment count that day >> its usual daily count
---                      (COUNT(*) OVER (PARTITION BY counterparty_id, pay_date))
---   rule_off_hours   : initiated outside business hours in the ENTITY's local time.
---                      hour_utc is UTC: SG = UTC+8, CN = +8, IN = +5.5, DE/NL = +1/+2, GB = 0/+1,
---                      US = -5..-8. Easiest to do this one in Python with zoneinfo.
-
-
--- -------------------------------------------------------------------------------------
--- Step 3 ✅ · Combine the rules into one alert view
+-- Step 2 · Combine the rules into one alert view
 -- -------------------------------------------------------------------------------------
 -- One row per outgoing external payment that trips at least one rule. n_rules = how many.
 -- Alerts per day = COUNT(*) / COUNT(DISTINCT pay_date).
@@ -139,7 +116,7 @@ WHERE rule_high_risk + rule_round + rule_structuring + rule_new_bene
 
 
 -- -------------------------------------------------------------------------------------
--- Step 4 ✅ · Score the alerts in Python
+-- Step 3 · Score the alerts in Python
 -- -------------------------------------------------------------------------------------
 -- Run:  .venv/bin/python -m treasury.analytics.score_alerts
 -- It compares vw_08_alerts with data_small/answer_key/business_anomalies.parquet and prints

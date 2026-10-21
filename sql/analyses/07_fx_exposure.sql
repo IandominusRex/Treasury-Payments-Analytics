@@ -14,7 +14,7 @@
 
 
 -- -------------------------------------------------------------------------------------
--- Step 1 ✅ given · Flows in a currency that is foreign to the entity
+-- Step 1 · Flows in a currency that is foreign to the entity
 -- -------------------------------------------------------------------------------------
 --   * signed_sgd: + for money in (we become LONG that currency), - for money out (SHORT)
 WITH fx_flows AS (
@@ -36,7 +36,7 @@ SELECT * FROM fx_flows LIMIT 20;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 2 ✅ · Net position by currency (the headline), then by entity and currency
+-- Step 2 · Net position by currency (the headline), then by entity and currency
 -- -------------------------------------------------------------------------------------
 -- Positive = long, negative = short. All-time flows (the 90-day window comes in step 3).
 WITH fx_flows AS (
@@ -79,7 +79,7 @@ GROUP BY entity_id, currency_code;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 3 ✅ · Value at risk from a currency move
+-- Step 3 · Value at risk from a currency move
 -- -------------------------------------------------------------------------------------
 -- A simple sensitivity (not statistical VaR) on the last 90 days of flows.
 WITH fx_flows AS (
@@ -107,7 +107,7 @@ GROUP BY currency_code;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 4 ✅ · Hedged share
+-- Step 4 · Hedged share
 -- -------------------------------------------------------------------------------------
 -- A forward is LIVE on date d if trade_date_id <= d < maturity_date_id. The date is pinned to 2026-09-15:
 -- the last forward matures on 2026-09-30, so on the last payment date (2026-10-01) no hedge is live.
@@ -213,7 +213,7 @@ GROUP BY currency_code;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 5 ✅ · Views
+-- Step 5 · Views
 -- -------------------------------------------------------------------------------------
 -- vw_07_net_position   net position per entity and currency, last 90 days to the as-of date (LONG / SHORT)
 -- vw_07_sensitivity    exposure and the loss from a 5% / 10% move, per currency

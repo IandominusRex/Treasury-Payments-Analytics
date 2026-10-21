@@ -10,7 +10,7 @@
 
 
 -- -------------------------------------------------------------------------------------
--- Step 1 ✅ given · Cross-border payments with settlement time in hours and a failure flag
+-- Step 1 · Cross-border payments with settlement time in hours and a failure flag
 -- -------------------------------------------------------------------------------------
 --   * pending excluded: not settled, not failed, yet - it would distort both metrics
 --   * hours_to_settle only for successful payments (failed ones never settled)
@@ -34,7 +34,7 @@ SELECT * FROM xb LIMIT 20;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 2 ✅ given (worked example) · Percentiles in SQLite with the rank trick
+-- Step 2 · Percentiles in SQLite with the rank trick
 -- -------------------------------------------------------------------------------------
 -- SQLite has no PERCENTILE_CONT. So:
 --   1. number each payment within its corridor, fastest first  (ROW_NUMBER)
@@ -66,27 +66,7 @@ ORDER BY p90_hours DESC;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 3 ✏️ TODO · The corridor scorecard
--- -------------------------------------------------------------------------------------
--- One row per corridor with: n_payments, value_sgd_m, fail_rate_pct, avg_hours, p50_hours, p90_hours.
--- 1. Start from the Step 1 CTE (xb), which has is_failed.
--- 2. fail_rate_pct = 100.0 * SUM(is_failed) / COUNT(*)
--- 3. avg_hours = AVG(hours_to_settle)  (AVG ignores the NULLs of failed payments - good)
--- 4. Join in P50/P90 from Step 2 (put Step 2's final SELECT in a CTE `pct` and JOIN on corridor).
--- 5. HAVING COUNT(*) >= 200.
--- ✔️ expect: SG -> VN has one of the highest P90s; US -> IN has the highest fail rate of the
---            big corridors, several times the median corridor (small dataset: ~6% vs ~2%).
-
-
--- -------------------------------------------------------------------------------------
--- Step 4 ✏️ TODO · Same scorecard by rail
--- -------------------------------------------------------------------------------------
--- Swap corridor for rail. Is the problem the corridor or the rail? (A slow corridor on a fast
--- rail points at the correspondent banks; check fact_payment_event.bank_id for its hops.)
-
-
--- -------------------------------------------------------------------------------------
--- Step 5 ✅ · Views
+-- Step 3 · Views
 -- -------------------------------------------------------------------------------------
 -- vw_02_corridor_scorecard   one row per corridor (>= 200 payments): volume, value, speed, failures
 -- (A rail scorecard was dropped: cross-border payments use only 2 rails, so it had 2 rows.

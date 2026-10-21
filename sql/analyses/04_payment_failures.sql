@@ -12,7 +12,7 @@
 
 
 -- -------------------------------------------------------------------------------------
--- Step 1 ✅ given · Overall failure rate
+-- Step 1 · Overall failure rate
 -- -------------------------------------------------------------------------------------
 SELECT COUNT(*)                                                       AS n_payments,
        SUM(status IN ('rejected', 'returned'))                        AS n_failed,
@@ -26,37 +26,7 @@ WHERE is_intercompany = 0
 
 
 -- -------------------------------------------------------------------------------------
--- Step 2 ✏️ TODO · Pareto of failure reasons
--- -------------------------------------------------------------------------------------
--- 1. Failed outgoing payments JOIN dim_failure_reason r ON r.reason_code = p.failure_reason.
--- 2. GROUP BY reason_code, description, category -> n_failed.
--- 3. Cumulative share with a running-total window:
---      100.0 * SUM(COUNT(*)) OVER (ORDER BY COUNT(*) DESC) / SUM(COUNT(*)) OVER ()  AS cum_pct
---    (window functions run AFTER GROUP BY, so you can window over the COUNT(*)s)
--- ✔️ expect: the top 3 reasons (AC01 and RR03 lead by far) cover ~70% of failures.
--- Then group by category instead: how much is "data" (fixable at source)?
-
-
--- -------------------------------------------------------------------------------------
--- Step 3 ✏️ TODO · Repeat offenders
--- -------------------------------------------------------------------------------------
--- Counterparties with the most failures:
---   GROUP BY counterparty_id, c.name, c.country
---   HAVING n_failed >= 5
---   ORDER BY n_failed DESC
--- Add their own fail rate (failed / all their payments). A supplier failing 30% of the time
--- has broken bank details in our master data.
--- ✔️ expect: a handful of suppliers stand out far above the rest.
-
-
--- -------------------------------------------------------------------------------------
--- Step 4 ✏️ TODO · Failure rate by rail and by month
--- -------------------------------------------------------------------------------------
--- Is it getting better or worse over time? Any month that spikes?
-
-
--- -------------------------------------------------------------------------------------
--- Step 5 ✅ · Views
+-- Step 2 · Views
 -- -------------------------------------------------------------------------------------
 -- vw_04_failure_pareto    failure reasons ranked, with share of failures and failed value
 -- vw_04_repeat_offenders  counterparties with >= 5 failed payments

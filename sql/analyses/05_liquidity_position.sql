@@ -1,24 +1,24 @@
 -- =====================================================================================
--- 05 · Liquidity and cash forecast (SQL prepares, Python forecasts)
+-- 05 · Liquidity position
 -- =====================================================================================
--- Question : how much cash will each entity and currency have over the next 13 weeks?
--- Method   : start with a moving average / seasonal baseline, compare with actuals, then improve
---            it with KNOWN future flows (open invoices by due date).
--- Metrics  : forecast error, MAPE, bias.
--- Chart    : actual vs forecast line with a band; error by week.
--- So what  : lets treasury fund shortfalls early (cheaply) instead of via overdraft (expensively).
--- Tables   : fact_balance, fact_payment, fact_invoice, dim_calendar, dim_account
+-- Question : how much cash does each entity and currency hold, and how does it move?
+-- Method   : daily closing balance and settled net cash flow per entity and currency, a weekly
+--            series, and the average flow by day of week (the payment-run rhythm).
+-- Metrics  : closing balance, net and gross flow, average net flow by weekday.
+-- Chart    : closing balance over time; average net inflow by weekday.
+-- So what  : lets treasury see a shortfall early and fund it cheaply instead of via overdraft.
+-- Tables   : fact_balance, fact_payment, fact_fx_rate, dim_account, dim_entity, dim_date
 --
--- SQL's job here: build clean daily/weekly time series. The forecasting model itself goes in
--- notebooks/05_forecast.ipynb (later), reading these views.
+-- SQL's job here: build clean daily/weekly time series. A 13-week forecast would read the same
+-- series (notebooks/05_forecast.ipynb); it is not built.
 -- =====================================================================================
 
 
 -- -------------------------------------------------------------------------------------
--- Step 1 ✅ given · Daily closing balance per entity and currency
+-- Step 1 · Daily closing balance per entity and currency
 -- -------------------------------------------------------------------------------------
 -- fact_balance is one row per account per day. Sum accounts up to entity + currency.
--- Keep the ORIGINAL currency here: forecasting in SGD would mix in FX moves.
+-- Keep the ORIGINAL currency here: converting to SGD would mix FX moves into the balance.
 SELECT b.date_id,
        a.entity_id,
        a.currency_code,
@@ -31,35 +31,7 @@ LIMIT 30;
 
 
 -- -------------------------------------------------------------------------------------
--- Step 2 ✏️ TODO · Daily net cash flow per entity and currency
--- -------------------------------------------------------------------------------------
--- Settled payments only. Use the settlement DATE (date(settled_ts)), not initiation: cash
--- moves when it settles.
---   net_flow = SUM(CASE WHEN direction = 'IN' THEN amount ELSE -amount END)
--- Keep intercompany IN here: from ONE entity's point of view, funding from HQ is real cash.
--- (Question: why is that different from analysis 01?)
-
-
--- -------------------------------------------------------------------------------------
--- Step 3 ✏️ TODO · Weekly series + seasonality checks
--- -------------------------------------------------------------------------------------
--- 1. Weekly: strftime('%Y-%W', ...) or join dim_date for year/week.
--- 2. Seasonality: average net flow by day_of_week (dim_date.day_of_week) and by is_month_end.
--- ✔️ expect: Tuesday/Thursday payment-run peaks, quiet weekends, month-end spikes (payroll, tax).
-
-
--- -------------------------------------------------------------------------------------
--- Step 4 ✏️ TODO · Known future flows: open invoices by due week
--- -------------------------------------------------------------------------------------
--- fact_invoice WHERE status IN ('open', 'part_paid'): AR = expected receipts, AP = expected payments.
--- Group by entity, currency and due week (due_date_id -> dim_date).
--- Business days: a due date on a holiday pays on the next business day in that COUNTRY -
--- dim_calendar(date_id, country_code, is_business_day) tells you which.
--- Remember customers pay late: dim_counterparty.avg_days_late. A good forecast shifts AR by it.
-
-
--- -------------------------------------------------------------------------------------
--- Step 5 ✅ · Views for the Python notebook and the dashboard
+-- Step 2 · Views for the dashboard
 -- -------------------------------------------------------------------------------------
 -- vw_05_daily_balance     closing balance per day, entity and currency (own currency and SGD)
 -- vw_05_daily_net_flow    settled net and gross flow per day, entity and currency (own currency and SGD)
@@ -67,7 +39,9 @@ LIMIT 30;
 -- vw_05_weekday_pattern   average net / gross flow by day of week (the payment-run rhythm)
 -- Amounts in the *_sgd columns can be summed across currencies and entities; the own-currency
 -- columns cannot (only add them up within one currency).
--- (open invoices by due week is not built yet)
+-- Net flow uses the settlement DATE (settled_ts), not initiation: cash moves when it settles.
+-- Intercompany payments are kept: from one entity's point of view, funding from HQ is real cash
+-- (analysis 01 leaves them out because it looks at money moving in and out of the group).
 -- In Python:  pd.read_sql("SELECT * FROM vw_05_daily_net_flow", con)
 
 DROP VIEW IF EXISTS vw_05_daily_balance;
