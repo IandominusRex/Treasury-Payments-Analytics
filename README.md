@@ -36,8 +36,8 @@ Built in Tableau Public from the SQL views in Step 3. A main page links to one d
   </tr>
   <tr>
     <td width="50%" align="center">
-      <a href="dashboards/screenshots/05_liquidity_forecast.png"><img src="dashboards/screenshots/05_liquidity_forecast.png" alt="5. Liquidity forecast"></a><br>
-      <b>5. Liquidity forecast</b>
+      <a href="dashboards/screenshots/05_liquidity_position.png"><img src="dashboards/screenshots/05_liquidity_position.png" alt="5. Liquidity position"></a><br>
+      <b>5. Liquidity position</b>
     </td>
     <td width="50%" align="center">
       <a href="dashboards/screenshots/06_cash_concentration.png"><img src="dashboards/screenshots/06_cash_concentration.png" alt="6. Cash concentration"></a><br>
@@ -1118,10 +1118,10 @@ Across the 24 months the failure rate stays between 1.05% and 1.88%, with an ave
 
 ➡️ **[See the SQL for these views in Step 3](#views-analysis-4)**
 
-## Analysis 5: Liquidity Forecast
-This analysis asks how much cash each entity and currency will have over the next 13 weeks, so treasury can fund a shortfall early instead of going into overdraft.
+## Analysis 5: Liquidity Position
+This analysis asks how much cash each entity and currency holds, and how it moves, so treasury can spot a shortfall early and fund it cheaply instead of going into overdraft.
 
-A forecast needs history to learn from, so the queries below prepare it: daily balances, daily net cash flow, a check that the two agree, then a weekly series and the day-of-week pattern. The forecast model itself is not built yet.
+The queries below build that picture: daily balances, daily net cash flow, a check that the two agree, then a weekly series and the day-of-week pattern. A forecast of the next 13 weeks would be the natural next step and would learn from this same history, but it is not built.
 ### Query 1 - Daily closing balances per entity and currency
 fact_balance is one row per account per day. We limit it to 14 (2 weeks for E01) to not bloat the table.
 ```SQL
@@ -2968,7 +2968,7 @@ GROUP BY month;
 
 <a id="views-analysis-5"></a>
 
-### Analysis 5: Liquidity Forecast
+### Analysis 5: Liquidity Position
 
 <details>
 <summary><code>vw_05_daily_balance</code>: closing balance per day, entity and currency</summary>
@@ -3049,7 +3049,7 @@ GROUP BY d.day_of_week, f.entity_id, f.entity_name, f.currency_code;
 
 </details>
 
-↩️ [Back to Analysis 5](#analysis-5-liquidity-forecast)
+↩️ [Back to Analysis 5](#analysis-5-liquidity-position)
 
 <a id="views-analysis-6"></a>
 
@@ -3359,7 +3359,7 @@ WHERE rule_high_risk + rule_round + rule_structuring + rule_new_bene
 | `sql/schema/` | 2 | Star schema (SQLite / Postgres) |
 | `sql/exploration/` | – | Ad-hoc queries for getting to know the data (start with `00_first_look.sql`) |
 | `sql/analyses/` | 2 | One query file per analysis (01–08). `deferred/` holds reconciliation |
-| `src/treasury/analytics/` | 2/3 | Forecasting (5) and anomaly models (8) |
+| `src/treasury/analytics/` | 2/3 | Applying the views, exporting them to CSV, and scoring the anomaly rules (8). The forecast for analysis 5 is not built |
 | `dashboards/` | 3 | `data/`: the CSVs Tableau reads · `screenshots/`: the images at the top of this README · `TreasuryAnalyticsDashboard.twbx`: copy of the published workbook (`extracts/` is git-ignored) |
 | `src/treasury/api/` | 4 | FastAPI: balances, payment status, KPIs, forecast, exceptions |
 | `docs/` | – | Architecture and the dataset design review |
@@ -3369,7 +3369,7 @@ WHERE rule_high_risk + rule_round + rule_structuring + rule_new_bene
 ## The eight analyses
 
 1. Money movement · 2. Cross-border · 3. Payment efficiency · 4. Failures ·
-5. Liquidity forecast · 6. Cash concentration · 7. FX exposure · 8. Anomaly detection
+5. Liquidity position · 6. Cash concentration · 7. FX exposure · 8. Anomaly detection
 
 Reconciliation (matching incoming payments to invoices) is deferred and is not one of the eight.
 
