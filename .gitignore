@@ -26,3 +26,7 @@ data/*
 
 # Small profile output
 data_small/*
+
+# Tableau: .hyper extracts are Tableau's own copy of dashboards/data/*.csv and are rebuilt on load
+dashboards/extracts/
+*.hyper

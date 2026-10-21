@@ -5,6 +5,57 @@ It simulates the payments of a fictional multinational group, then builds a clea
 
 > **All data is synthetic.** Entities, banks, BICs, counterparties and names are generated. No real client or employer data is used.
 
+## Dashboards
+
+**[Open the live dashboards on Tableau Public](https://public.tableau.com/app/profile/ian.zhen.jun.lim/viz/TreasuryAnalyticsDashboard/MainPage)**
+
+Built in Tableau Public from the SQL views in Step 3. A main page links to one dashboard per analysis, and each dashboard has its own filters. They are best viewed full screen (the full-screen button under the dashboard on Tableau Public), because a narrow browser window crops the layout. The pictures below are screenshots of each page. Click any image to open it full size.
+
+<a href="dashboards/screenshots/00_overview.png"><img src="dashboards/screenshots/00_overview.png" alt="Overview dashboard" width="100%"></a>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/01_money_movement.png"><img src="dashboards/screenshots/01_money_movement.png" alt="1. Money movement"></a><br>
+      <b>1. Money movement</b>
+    </td>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/02_cross_border.png"><img src="dashboards/screenshots/02_cross_border.png" alt="2. Cross-border"></a><br>
+      <b>2. Cross-border</b>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/03_payment_efficiency.png"><img src="dashboards/screenshots/03_payment_efficiency.png" alt="3. Payment efficiency"></a><br>
+      <b>3. Payment efficiency</b>
+    </td>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/04_payment_failures.png"><img src="dashboards/screenshots/04_payment_failures.png" alt="4. Payment failures"></a><br>
+      <b>4. Payment failures</b>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/05_liquidity_forecast.png"><img src="dashboards/screenshots/05_liquidity_forecast.png" alt="5. Liquidity forecast"></a><br>
+      <b>5. Liquidity forecast</b>
+    </td>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/06_cash_concentration.png"><img src="dashboards/screenshots/06_cash_concentration.png" alt="6. Cash concentration"></a><br>
+      <b>6. Cash concentration</b>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/07_fx_exposure.png"><img src="dashboards/screenshots/07_fx_exposure.png" alt="7. FX exposure"></a><br>
+      <b>7. FX exposure</b>
+    </td>
+    <td width="50%" align="center">
+      <a href="dashboards/screenshots/08_anomaly_detection.png"><img src="dashboards/screenshots/08_anomaly_detection.png" alt="8. Anomaly detection"></a><br>
+      <b>8. Anomaly detection</b>
+    </td>
+  </tr>
+</table>
+
 ## The dataset at a glance
 
 Picture one fictional company, **Group Treasury HQ in Singapore**, that owns ten other companies around the world. Every day those companies pay suppliers, get paid by customers, run payroll and move cash between themselves. The dataset is the record of all of that over 24 months: about **106,000 payments**, worth roughly **S$2.65 billion** (completed external payments).
@@ -2522,13 +2573,14 @@ sql/analyses/*.sql  --(run)-->  views inside treasury.sqlite  --(export)-->  das
 - The views are written in the SQL files, so the SQL files stay the single source of truth. Two small Python programs in `src/treasury/analytics/` move them around, because plain SQLite has no "run all my views" button:
   - `views.py` runs every `CREATE VIEW` statement in `sql/analyses/*.sql` inside the clean database. It also drops views that I have since deleted from the SQL files.
   - `export_views.py` reads each view and writes it to `dashboards/data/<view name>.csv`. Any `date_id` column (a number like 20241001) also gets a real `date` column, because Tableau needs a proper date to draw a time axis.
+- Analyses 1 to 7 also have a **cube** view, `vw_0N_cube`, that puts every filter field in one table. The dashboards are built on these, so one filter reaches every chart on the page (see [The cube CSVs](#the-cube-csvs)).
 - Anomaly **scoring** is the one piece that is not a view. It compares my alerts with the answer key, which must never go into the clean database. So `score_alerts.py` writes its result straight to `dashboards/data/08_rule_scores.csv`.
 
 ## Steps
 1. **Build the data (only if `data_small/` does not exist yet).** `.venv/bin/treasury-sim backfill --config config/simulation.small.yaml` takes about 20 seconds. Skip this if the data is already there.
 2. **Create the views in the database.** From the project folder, run
    `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/python -m treasury.analytics.views`.
-   It prints the 24 views it created. They live inside `data_small/clean/treasury.sqlite`, which is not committed to git, so on a fresh build you must run this step again.
+   It prints the 31 views it created. They live inside `data_small/clean/treasury.sqlite`, which is not committed to git, so on a fresh build you must run this step again.
 3. **Export the views to CSV.** Run
    `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/python -m treasury.analytics.export_views`.
    It writes one CSV per view to `dashboards/data/` and prints the row count of each. Old CSVs of deleted views are removed first, so the folder only holds current files.
@@ -2536,26 +2588,47 @@ sql/analyses/*.sql  --(run)-->  views inside treasury.sqlite  --(export)-->  das
    `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/python -m treasury.analytics.score_alerts`.
    It prints the precision and recall of each rule and writes `dashboards/data/08_rule_scores.csv`. This needs step 2 first, because it reads `vw_08_alerts`.
 5. **Check the files.** Open one or two CSVs and compare them with the README. For example `vw_01_currency.csv` should have a USD row with about 1,028M SGD, and `vw_05_daily_balance.csv` should have a `date` column.
-6. **Commit the CSVs.** They are small (about 3 MB), contain only synthetic data and are what Tableau reads, so they are committed to git.
-7. **Load them into Tableau Public**
+6. **Commit the CSVs.** They are small (about 13 MB, mostly the cubes), contain only synthetic data and are what Tableau reads, so they are committed to git.
+7. **Load them into Tableau Public.** Connect to each CSV as a text file, build the sheets, and put them on one dashboard per analysis. A main page has a button to each dashboard, and each dashboard has a Home button and a button to the next analysis. Tableau also keeps its own copy of the data as `.hyper` extract files in `dashboards/extracts/`. Those are git-ignored, because Tableau rebuilds them from the CSVs.
+8. **Publish and save a copy.** Use File > Save to Tableau Public As…. The workbook is live at the [Tableau Public link](https://public.tableau.com/app/profile/ian.zhen.jun.lim/viz/TreasuryAnalyticsDashboard/MainPage). A copy of the published workbook is committed as `dashboards/TreasuryAnalyticsDashboard.twbx` (on the Tableau Public page: Download > Tableau Workbook). It opens in Tableau Public Desktop and carries its own copy of the data. After changing the dashboards, publish again and download a fresh copy.
 
 Run steps 2 to 4 again whenever I edit a view in the SQL files or rebuild the data. A rebuild drops all the views, so step 2 always comes first.
 
 ## Which CSV feeds which dashboard
-| Dashboard | CSVs | Main charts |
-|---|---|---|
-| 1 Money movement | `vw_01_currency`, `vw_01_corridor`, `vw_01_entity`, `vw_01_monthly` | value by currency, top corridors, inflow vs outflow per entity, monthly trend |
-| 2 Cross-border | `vw_02_corridor_scorecard` | speed vs failure rate per corridor |
-| 3 Payment efficiency | `vw_03_channel_efficiency`, `vw_03_rail_timing`, `vw_03_stage_durations` | straight-through rate by channel, settlement time by rail, where the time goes |
-| 4 Failures | `vw_04_failure_pareto`, `vw_04_repeat_offenders`, `vw_04_risk_rating`, `vw_04_failure_rail`, `vw_04_failure_trend` | Pareto of reasons, repeat offenders, failure rate by risk, rail and month |
-| 5 Liquidity | `vw_05_daily_balance`, `vw_05_daily_net_flow`, `vw_05_weekly_net_flow`, `vw_05_weekday_pattern` | balance over time, net flow, weekday rhythm (history only, no forecast yet) |
-| 6 Cash concentration | `vw_06_account_position`, `vw_06_daily_idle_vs_overdrawn`, `vw_06_pooling_benefit` | idle vs overdrawn cash, pooling saving per scenario |
-| 7 FX exposure | `vw_07_net_position`, `vw_07_sensitivity`, `vw_07_hedged_share` | long/short position, loss from a 5% and 10% move, hedged share |
-| 8 Anomalies | `vw_08_alerts`, `08_rule_scores` | alerts per rule, precision and recall per rule, the alert list |
+The published workbook reads the CSVs in the second column. Dashboards 1 to 7 are built on a cube (next section), so one filter drives every chart on the page. Dashboard 6 also reads `vw_06_pooling_benefit`, and dashboard 8 reads the alert list and the rule scores. The per-chart CSVs in the third column hold the same numbers, one table per chart. They are still exported, but the workbook does not read them.
+
+| Dashboard | Read by the workbook | Per-chart CSVs (not read by the workbook) | Main charts |
+|---|---|---|---|
+| 1 Money movement | `vw_01_cube` | `vw_01_currency`, `vw_01_corridor`, `vw_01_entity`, `vw_01_monthly` | value by currency, top corridors, inflow vs outflow per entity, monthly trend |
+| 2 Cross-border | `vw_02_cube` | `vw_02_corridor_scorecard` | speed vs failure rate per corridor |
+| 3 Payment efficiency | `vw_03_cube` | `vw_03_channel_efficiency`, `vw_03_rail_timing`, `vw_03_stage_durations` | straight-through rate by channel, settlement time by rail, where the time goes |
+| 4 Failures | `vw_04_cube` | `vw_04_failure_pareto`, `vw_04_repeat_offenders`, `vw_04_risk_rating`, `vw_04_failure_rail`, `vw_04_failure_trend` | Pareto of reasons, repeat offenders, failure rate by risk, rail and month |
+| 5 Liquidity | `vw_05_cube` | `vw_05_daily_balance`, `vw_05_daily_net_flow`, `vw_05_weekly_net_flow`, `vw_05_weekday_pattern` | balance over time, net flow, weekday rhythm (history only, no forecast yet) |
+| 6 Cash concentration | `vw_06_cube`, `vw_06_pooling_benefit` | `vw_06_account_position`, `vw_06_daily_idle_vs_overdrawn` | idle vs overdrawn cash, pooling saving per scenario |
+| 7 FX exposure | `vw_07_cube` | `vw_07_net_position`, `vw_07_sensitivity`, `vw_07_hedged_share` | long/short position, loss from a 5% and 10% move, hedged share |
+| 8 Anomalies | `vw_08_alerts`, `08_rule_scores` | none | alerts per rule, precision and recall per rule, the alert list |
+
+## The cube CSVs
+
+A **cube** here is one table per analysis that holds every filter field next to the numbers, so a whole dashboard can sit on a single data source. Tableau treats each CSV as its own data source, and a filter on one source cannot reach a chart built on another. With one table for all the charts, a filter on entity, month or currency reaches all of them.
+
+A cube stores only **sums and counts**, because those add up correctly under any filter. Ratios are not stored. They are rebuilt in Tableau as `SUM(a) / SUM(b)`: for example, straight-through rate is `SUM(n_stp) / SUM(n_payments)`. A stored percentage would be wrong as soon as a filter removed some of its rows.
+
+| Analysis | Cube | One row per | Main columns |
+|---|---|---|---|
+| 1 | `vw_01_cube` | month × entity × currency × sender / receiver country | `n_payments`, `value_sgd`, `inflow_sgd`, `outflow_sgd`, `is_cross_border` |
+| 2 | `vw_02_cube` | month × entity × corridor × rail | `n_payments`, `n_settled`, `sum_hours`, `n_over_48h`, `n_failed` |
+| 3 | `vw_03_cube` | month × entity × channel × rail | `n_payments`, `n_stp`, `n_repaired`, `n_missed_cutoff`, `sum_hours`, `n_staged`, `stage_1_hours` to `stage_3_hours` |
+| 4 | `vw_04_cube` | month × entity × rail × counterparty × failure reason | `n_payments`, `n_failed`, `failed_value_sgd` |
+| 5 | `vw_05_cube` | day × entity × currency | `closing_balance_sgd`, `net_flow_sgd`, `gross_flow_sgd`, `flow_day` |
+| 6 | `vw_06_cube` | day × account | `balance_sgd`, `idle_sgd`, `idle_movable_sgd`, `idle_trapped_sgd`, `overdrawn_sgd`, `headroom_sgd` |
+| 7 | `vw_07_cube` | entity × currency at the as-of date | `net_sgd`, `hedge_sgd` |
+
+Analysis 8 has no cube: its dashboard reads the alert list directly. The comments above each cube in `sql/analyses/*.sql` give the Tableau formula for every measure that is not a plain sum.
 
 ## The view SQL
 
-Each analysis ends with a link that jumps here. The blocks below are copies of the views in `sql/analyses/*.sql`, which stay the source of truth: `views.py` (step 2 above) runs those files, not this page. Click a view to expand its SQL.
+Each analysis ends with a link that jumps here. The blocks below are copies of the views in `sql/analyses/*.sql`, which stay the source of truth: `views.py` (step 2 above) runs those files, not this page. Click a view to expand its SQL. The seven cube views (`vw_0N_cube`) live in the same SQL files but are not copied here; [The cube CSVs](#the-cube-csvs) explains them.
 
 <a id="views-analysis-1"></a>
 
@@ -3273,6 +3346,7 @@ WHERE rule_high_risk + rule_round + rule_structuring + rule_new_bene
 - Amounts in the `_sgd` columns can be added together across currencies and entities. Amounts in a currency's own units (for example `closing_balance`) cannot, so filter to one currency before summing them.
 - The CSVs come from the small profile (about 106,000 payments). The numbers on the dashboard will match the small-profile numbers in this README.
 - A view only exports what is in the database at that moment. If the data changes, run steps 2 to 4 again before reloading Tableau (Data > Refresh).
+- The workbook on Tableau Public is a snapshot of the CSVs from when I published it. After re-exporting, refresh the data in Tableau Desktop, publish again and replace the `.twbx` copy in `dashboards/`.
 
 ## Layout
 
@@ -3286,7 +3360,7 @@ WHERE rule_high_risk + rule_round + rule_structuring + rule_new_bene
 | `sql/exploration/` | – | Ad-hoc queries for getting to know the data (start with `00_first_look.sql`) |
 | `sql/analyses/` | 2 | One query file per analysis (01–08). `deferred/` holds reconciliation |
 | `src/treasury/analytics/` | 2/3 | Forecasting (5) and anomaly models (8) |
-| `dashboards/` | 3 | BI files and screenshots |
+| `dashboards/` | 3 | `data/`: the CSVs Tableau reads · `screenshots/`: the images at the top of this README · `TreasuryAnalyticsDashboard.twbx`: copy of the published workbook (`extracts/` is git-ignored) |
 | `src/treasury/api/` | 4 | FastAPI: balances, payment status, KPIs, forecast, exceptions |
 | `docs/` | – | Architecture and the dataset design review |
 | `docs/dataset/` | – | Dataset card and sample CSVs, auto-generated and committed so GitHub can preview the data |
@@ -3314,7 +3388,8 @@ guarantees each analysis has something to find.
 - [x] Part 1b cleaning pipeline: skipped on purpose, the analyses use the clean database
 - [x] Part 2 SQL analyses (1-8 done, views in `sql/analyses/`, applied with `python -m treasury.analytics.views`)
 - [x] Part 3a: views exported to CSV for Tableau (`dashboards/data/`)
-- [ ] Part 3b: Tableau dashboards · Part 4 API
+- [x] Part 3b: Tableau dashboards, [published on Tableau Public](https://public.tableau.com/app/profile/ian.zhen.jun.lim/viz/TreasuryAnalyticsDashboard/MainPage) (a main page and one dashboard per analysis)
+- [ ] Part 4: API
 
 ## What's in the data
 
