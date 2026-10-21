@@ -288,3 +288,20 @@ SELECT n.entity_id, n.entity_name, n.functional_currency, n.currency_code, n.as_
        ROUND(-COALESCE(h.hedge_sgd, 0) / NULLIF(n.net_sgd, 0), 4)        AS hedged_pct
 FROM vw_07_net_position n
 LEFT JOIN hedged h ON h.entity_id = n.entity_id AND h.currency_code = n.currency_code;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_07_cube   ONE source for the whole Analysis 7 dashboard
+-- -------------------------------------------------------------------------------------
+-- One row per entity x currency at the as-of date, sums only (net_sgd, hedge_sgd). Build the
+-- three views above in Tableau, so one filter (entity, currency, functional currency) drives them all:
+--   position     IF SUM(net_sgd) >= 0 THEN 'LONG' ELSE 'SHORT' END
+--   hedged %     -SUM(hedge_sgd) / SUM(net_sgd)
+--   exposure     ABS(SUM(net_sgd))        loss from a 5% move = ABS(SUM(net_sgd)) * 0.05   (10%: * 0.10)
+-- The exposure and loss calcs net long and short entities inside the chart, so keep currency on the
+-- chart (one bar per currency), as vw_07_sensitivity does.
+-- Same rows as vw_07_hedged_share: an entity x currency with no flows in the last 90 days is not listed.
+DROP VIEW IF EXISTS vw_07_cube;
+CREATE VIEW vw_07_cube AS
+SELECT entity_id, entity_name, functional_currency, currency_code, as_of_date_id, net_sgd, hedge_sgd
+FROM vw_07_hedged_share;

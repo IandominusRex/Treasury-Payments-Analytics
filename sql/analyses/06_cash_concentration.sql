@@ -260,3 +260,38 @@ SELECT name                                          AS scenario,
        ROUND(SUM(saving) / (COUNT(*) / 365.0))       AS annual_saving_sgd
 FROM cost
 GROUP BY name;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_06_cube   source for the position and idle-vs-overdrawn charts of Analysis 6 (NOT the pooling saving)
+-- -------------------------------------------------------------------------------------
+-- One row per day x account, every account (pooled ones too: filter is_pooled = 0 for the idle vs
+-- overdrawn chart, as vw_06_daily_idle_vs_overdrawn does). All columns are sums, so they add up under
+-- any filter. Two measures are NOT stored because they are not sums; build them in Tableau at the
+-- day level (the netting then follows whatever entities are filtered):
+--   offsettable cash     MIN(SUM(idle_movable_sgd), SUM(overdrawn_sgd))
+--   remaining overdraft  SUM(overdrawn_sgd) - offsettable cash
+-- The latest-day account table (vw_06_account_position) = this cube filtered to the last date.
+-- vw_06_pooling_benefit stays its own view: it prices each overdrawn account at its own debit rate
+-- and each idle account at its own credit rate, per scenario, which cannot be rebuilt from sums.
+DROP VIEW IF EXISTS vw_06_cube;
+CREATE VIEW vw_06_cube AS
+SELECT b.date_id, a.account_id, a.entity_id, e.name AS entity_name, a.currency_code,
+       a.is_pooled, c.is_restricted, e.is_in_house_bank,
+       ROUND(b.closing_balance, 2)                                                        AS balance,
+       ROUND(b.closing_balance * fx.rate_to_sgd, 2)                                       AS balance_sgd,
+       ROUND(a.target_balance * fx.rate_to_sgd, 2)                                        AS target_sgd,
+       ROUND(MAX(0, b.closing_balance - a.target_balance) * fx.rate_to_sgd, 2)            AS idle_sgd,
+       CASE WHEN c.is_restricted = 0
+            THEN ROUND(MAX(0, b.closing_balance - a.target_balance) * fx.rate_to_sgd, 2) ELSE 0 END AS idle_movable_sgd,
+       CASE WHEN c.is_restricted = 1
+            THEN ROUND(MAX(0, b.closing_balance - a.target_balance) * fx.rate_to_sgd, 2) ELSE 0 END AS idle_trapped_sgd,
+       ROUND(MAX(0, -b.closing_balance) * fx.rate_to_sgd, 2)                              AS overdrawn_sgd,
+       CASE WHEN e.is_in_house_bank = 1
+            THEN ROUND(MAX(0, -b.closing_balance) * fx.rate_to_sgd, 2) ELSE 0 END         AS overdrawn_hq_sgd,
+       ROUND((a.overdraft_limit + MIN(0, b.closing_balance)) * fx.rate_to_sgd, 2)         AS headroom_sgd
+FROM fact_balance b
+JOIN dim_account a   ON a.account_id = b.account_id
+JOIN dim_entity e    ON e.entity_id = a.entity_id
+JOIN dim_currency c  ON c.currency_code = b.currency_code
+JOIN fact_fx_rate fx ON fx.date_id = b.date_id AND fx.currency_code = b.currency_code;

@@ -120,3 +120,39 @@ SELECT d.day_of_week,
 FROM vw_05_daily_net_flow f
 JOIN dim_date d ON d.date_id = f.date_id
 GROUP BY d.day_of_week, f.entity_id, f.entity_name, f.currency_code;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_05_cube   ONE source for the whole Analysis 5 dashboard
+-- -------------------------------------------------------------------------------------
+-- One row per day x entity x currency, so a filter on any field reaches every chart. It replaces
+-- the four views above, which are built from it again in Tableau:
+--   balance over time   SUM(closing_balance_sgd)   a snapshot: add up entities / currencies on ONE day,
+--                       never across days (use the last day of the week / month, or AVG per day)
+--   net flow            SUM(net_flow_sgd)          weekly chart: group by week_start
+--   weekday rhythm      SUM(net_flow_sgd) / COUNTD(IF [flow_day] = 1 THEN [date] END), grouped by weekday
+-- The own-currency columns (closing_balance, net_flow, gross_flow) only add up within ONE currency.
+-- flow_day = 1 when anything settled that day. Days without a settlement have NULL flows, so the
+-- weekday average counts only days with payments (the same as vw_05_weekday_pattern).
+-- FULL OUTER JOIN: payments settle on 2026-10-01, one day past the last balance, and are kept.
+DROP VIEW IF EXISTS vw_05_cube;
+CREATE VIEW vw_05_cube AS
+SELECT d.date_id,
+       date(d.date, '-' || d.day_of_week || ' days')          AS week_start,   -- the Monday
+       d.day_of_week,
+       CASE d.day_of_week WHEN 0 THEN 'Mon' WHEN 1 THEN 'Tue' WHEN 2 THEN 'Wed' WHEN 3 THEN 'Thu'
+                          WHEN 4 THEN 'Fri' WHEN 5 THEN 'Sat' ELSE 'Sun' END AS weekday,
+       COALESCE(b.entity_id, f.entity_id)                     AS entity_id,
+       COALESCE(b.entity_name, f.entity_name)                 AS entity_name,
+       COALESCE(b.currency_code, f.currency_code)             AS currency_code,
+       b.closing_balance,
+       b.closing_balance_sgd,
+       f.net_flow,
+       f.gross_flow,
+       f.net_flow_sgd,
+       f.gross_flow_sgd,
+       CASE WHEN f.date_id IS NOT NULL THEN 1 ELSE 0 END      AS flow_day
+FROM vw_05_daily_balance b
+FULL OUTER JOIN vw_05_daily_net_flow f
+       ON f.date_id = b.date_id AND f.entity_id = b.entity_id AND f.currency_code = b.currency_code
+JOIN dim_date d ON d.date_id = COALESCE(b.date_id, f.date_id);

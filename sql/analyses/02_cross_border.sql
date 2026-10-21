@@ -117,3 +117,37 @@ SELECT corridor,
 FROM xb
 GROUP BY corridor, sender_country, receiver_country
 HAVING n_payments >= 200;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_02_cube   ONE source for the whole Analysis 2 dashboard
+-- -------------------------------------------------------------------------------------
+-- One row per month x entity x corridor x rail, with sums and counts only, so a filter on any
+-- field reaches every chart. Rebuild the scorecard in Tableau:
+--   avg hours = SUM(sum_hours) / SUM(n_settled)    % over 48h = SUM(n_over_48h) / SUM(n_settled)
+--   failure % = SUM(n_failed) / SUM(n_payments)
+-- Same population as vw_02_corridor_scorecard (cross-border, no intercompany, not pending), but
+-- without its ">= 200 payments" cut: filter on SUM(n_payments) in Tableau instead.
+DROP VIEW IF EXISTS vw_02_cube;
+CREATE VIEW vw_02_cube AS
+SELECT date(p.initiated_ts, 'start of month')                  AS month_start,
+       e.entity_id,
+       e.name                                                  AS entity_name,
+       p.sender_country || ' -> ' || p.receiver_country        AS corridor,
+       p.sender_country,
+       p.receiver_country,
+       t.rail,
+       COUNT(*)                                                AS n_payments,
+       ROUND(SUM(p.amount_sgd), 2)                             AS value_sgd,
+       SUM(p.settled_ts IS NOT NULL)                           AS n_settled,
+       ROUND(SUM((julianday(p.settled_ts) - julianday(p.initiated_ts)) * 24), 2) AS sum_hours,
+       SUM((julianday(p.settled_ts) - julianday(p.initiated_ts)) * 24 > 48)      AS n_over_48h,
+       SUM(p.status IN ('rejected', 'returned'))               AS n_failed
+FROM fact_payment p
+JOIN dim_account      a ON a.account_id = p.account_id
+JOIN dim_entity       e ON e.entity_id  = a.entity_id
+JOIN dim_payment_type t ON t.type_id    = p.type_id
+WHERE p.is_intercompany = 0
+  AND p.sender_country <> p.receiver_country
+  AND p.status <> 'pending'
+GROUP BY month_start, e.entity_id, e.name, corridor, p.sender_country, p.receiver_country, t.rail;

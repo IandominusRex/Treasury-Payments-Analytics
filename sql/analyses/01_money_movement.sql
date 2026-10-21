@@ -154,3 +154,35 @@ FROM fact_payment p
 WHERE p.is_intercompany = 0
   AND p.status IN ('completed', 'delayed')
 GROUP BY month;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_01_cube   ONE source for the whole Analysis 1 dashboard
+-- -------------------------------------------------------------------------------------
+-- The four views above each feed one chart, so in Tableau they are four separate data sources
+-- and a click or filter on one chart cannot reach the others. This view has every filter
+-- field in one table (month, entity, currency, sender / receiver country), so all four charts
+-- can use it and one filter drives them all. Only sums and counts are stored (they add up under
+-- any filter); build the charts from them:
+--   net inflow = SUM(inflow_sgd) - SUM(outflow_sgd)      corridor chart: filter is_cross_border = 1
+-- Same population as the views above (no intercompany, completed / delayed only).
+DROP VIEW IF EXISTS vw_01_cube;
+CREATE VIEW vw_01_cube AS
+SELECT date(p.initiated_ts, 'start of month')                  AS month_start,
+       e.entity_id,
+       e.name                                                  AS entity_name,
+       p.currency_code,
+       p.sender_country,
+       p.receiver_country,
+       p.sender_country || ' -> ' || p.receiver_country        AS corridor,
+       CASE WHEN p.sender_country <> p.receiver_country THEN 1 ELSE 0 END AS is_cross_border,
+       COUNT(*)                                                AS n_payments,
+       ROUND(SUM(p.amount_sgd), 2)                             AS value_sgd,
+       ROUND(SUM(CASE WHEN p.direction = 'IN'  THEN p.amount_sgd ELSE 0 END), 2) AS inflow_sgd,
+       ROUND(SUM(CASE WHEN p.direction = 'OUT' THEN p.amount_sgd ELSE 0 END), 2) AS outflow_sgd
+FROM fact_payment p
+JOIN dim_account a ON a.account_id = p.account_id
+JOIN dim_entity  e ON e.entity_id  = a.entity_id
+WHERE p.is_intercompany = 0
+  AND p.status IN ('completed', 'delayed')
+GROUP BY month_start, e.entity_id, e.name, p.currency_code, p.sender_country, p.receiver_country;

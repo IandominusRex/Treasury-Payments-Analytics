@@ -145,3 +145,43 @@ WHERE p.is_intercompany = 0
   AND p.direction = 'OUT'
   AND p.status <> 'pending'
 GROUP BY month;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_04_cube   ONE source for the whole Analysis 4 dashboard
+-- -------------------------------------------------------------------------------------
+-- One row per month x entity x rail x counterparty x failure reason (failure_reason is empty for
+-- payments that did not fail), with counts and sums only. Rebuild in Tableau:
+--   fail rate % = SUM(n_failed) / SUM(n_payments)         pareto: filter n_failed > 0, rank by reason
+--   repeat offenders: group by counterparty, keep SUM(n_failed) >= 5
+-- Same population as the vw_04_* views (our outbound payments, no intercompany, not pending).
+DROP VIEW IF EXISTS vw_04_cube;
+CREATE VIEW vw_04_cube AS
+SELECT date(p.initiated_ts, 'start of month')                  AS month_start,
+       e.entity_id,
+       e.name                                                  AS entity_name,
+       t.rail,
+       p.counterparty_id,
+       cp.name                                                 AS counterparty_name,
+       cp.counterparty_type,
+       cp.country                                              AS counterparty_country,
+       cp.risk_rating,
+       ROUND(cp.data_quality_score, 2)                         AS data_quality_score,
+       p.failure_reason,
+       dfr.description                                         AS failure_description,
+       dfr.category                                            AS failure_category,
+       COUNT(*)                                                AS n_payments,
+       SUM(p.status IN ('rejected', 'returned'))               AS n_failed,
+       ROUND(SUM(CASE WHEN p.status IN ('rejected', 'returned') THEN p.amount_sgd ELSE 0 END), 2)
+                                                               AS failed_value_sgd
+FROM fact_payment p
+JOIN dim_account      a  ON a.account_id      = p.account_id
+JOIN dim_entity       e  ON e.entity_id       = a.entity_id
+JOIN dim_payment_type t  ON t.type_id         = p.type_id
+JOIN dim_counterparty cp ON cp.counterparty_id = p.counterparty_id
+LEFT JOIN dim_failure_reason dfr ON dfr.reason_code = p.failure_reason
+WHERE p.is_intercompany = 0
+  AND p.direction = 'OUT'
+  AND p.status <> 'pending'
+GROUP BY month_start, e.entity_id, e.name, t.rail, p.counterparty_id, cp.name, cp.counterparty_type,
+         cp.country, cp.risk_rating, cp.data_quality_score, p.failure_reason, dfr.description, dfr.category;

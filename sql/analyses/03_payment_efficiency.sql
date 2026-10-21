@@ -217,3 +217,50 @@ SELECT 2, 'Approved to submitted', COUNT(*),
 UNION ALL
 SELECT 3, 'Submitted to settled', COUNT(*),
        ROUND(AVG((julianday(settled_ts)   - julianday(submitted_ts)) * 24), 1) FROM done;
+
+
+-- -------------------------------------------------------------------------------------
+-- vw_03_cube   ONE source for the whole Analysis 3 dashboard
+-- -------------------------------------------------------------------------------------
+-- One row per month x entity x channel x rail, with sums and counts only. Rebuild the rates in
+-- Tableau: STP % = SUM(n_stp) / SUM(n_payments); avg hours = SUM(sum_hours) / SUM(n_payments);
+-- avg stage hours = SUM(stage_x_hours) / SUM(n_staged).
+-- Same population as vw_03_channel_efficiency / vw_03_rail_timing (our outbound payments, no
+-- intercompany, completed / delayed). The stage columns only cover payments with all four events,
+-- so use n_staged (not n_payments) as their denominator.
+DROP VIEW IF EXISTS vw_03_cube;
+CREATE VIEW vw_03_cube AS
+WITH ev AS (
+    SELECT payment_id,
+           MIN(CASE WHEN status = 'CREATED'   THEN event_ts END) AS created_ts,
+           MIN(CASE WHEN status = 'APPROVED'  THEN event_ts END) AS approved_ts,
+           MIN(CASE WHEN status = 'SUBMITTED' THEN event_ts END) AS submitted_ts,
+           MIN(CASE WHEN status = 'SETTLED'   THEN event_ts END) AS settled_ts
+    FROM fact_payment_event
+    GROUP BY payment_id
+)
+SELECT date(p.initiated_ts, 'start of month')                  AS month_start,
+       e.entity_id,
+       e.name                                                  AS entity_name,
+       p.channel,
+       t.rail,
+       COUNT(*)                                                AS n_payments,
+       SUM(p.is_stp)                                           AS n_stp,
+       SUM(p.repair_count > 0)                                 AS n_repaired,
+       SUM(p.missed_cutoff)                                    AS n_missed_cutoff,
+       ROUND(SUM((julianday(p.settled_ts) - julianday(p.initiated_ts)) * 24), 2) AS sum_hours,
+       SUM((julianday(p.settled_ts) - julianday(p.initiated_ts)) * 24 > 48)      AS n_over_48h,
+       COUNT(ev.payment_id)                                    AS n_staged,
+       ROUND(SUM((julianday(ev.approved_ts)  - julianday(ev.created_ts))   * 24), 2) AS stage_1_hours,
+       ROUND(SUM((julianday(ev.submitted_ts) - julianday(ev.approved_ts))  * 24), 2) AS stage_2_hours,
+       ROUND(SUM((julianday(ev.settled_ts)   - julianday(ev.submitted_ts)) * 24), 2) AS stage_3_hours
+FROM fact_payment p
+JOIN dim_account      a ON a.account_id = p.account_id
+JOIN dim_entity       e ON e.entity_id  = a.entity_id
+JOIN dim_payment_type t ON t.type_id    = p.type_id
+LEFT JOIN ev ON ev.payment_id = p.payment_id
+             AND ev.approved_ts IS NOT NULL AND ev.submitted_ts IS NOT NULL AND ev.settled_ts IS NOT NULL
+WHERE p.is_intercompany = 0
+  AND p.direction = 'OUT'
+  AND p.status IN ('completed', 'delayed')
+GROUP BY month_start, e.entity_id, e.name, p.channel, t.rail;
