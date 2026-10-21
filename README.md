@@ -2577,7 +2577,7 @@ sql/analyses/*.sql  --(run)-->  views inside treasury.sqlite  --(export)-->  das
 - Anomaly **scoring** is the one piece that is not a view. It compares my alerts with the answer key, which must never go into the clean database. So `score_alerts.py` writes its result straight to `dashboards/data/08_rule_scores.csv`.
 
 ## Steps
-1. **Build the data (only if `data_small/` does not exist yet).** `.venv/bin/treasury-sim backfill --config config/simulation.small.yaml` takes about 20 seconds. Skip this if the data is already there.
+1. **Build the data (only if `data_small/` does not exist yet).** `.venv/bin/treasury-sim --config config/simulation.small.yaml backfill` takes about 20 seconds. Skip this if the data is already there.
 2. **Create the views in the database.** From the project folder, run
    `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/python -m treasury.analytics.views`.
    It prints the 31 views it created. They live inside `data_small/clean/treasury.sqlite`, which is not committed to git, so on a fresh build you must run this step again.

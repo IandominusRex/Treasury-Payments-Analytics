@@ -8,7 +8,7 @@ Treasury payments analytics portfolio project. Source lesson plan is in Notion:
 - Full data build: `.venv/bin/treasury-sim backfill` (~2 min). Dimensions/FX only: `treasury-sim build-world`
 - Live mode: `.venv/bin/treasury-sim stream --days 7 --speed 300` (`--speed 0` = no pacing, `--webhook URL`)
 - camt.053: `.venv/bin/treasury-sim export-camt053 --account A001 --date 2026-09-15`
-- Small profile (~106k payments, builds in ~20s, writes to `data_small/`): add `--config config/simulation.small.yaml` to any command. `export-all` rebuilds the Excel workbook, CSVs (`data_small/exports/`) and `docs/dataset/`; it runs automatically after backfill and during stream. Tests against it: `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/pytest`.
+- Small profile (~106k payments, builds in ~20s, writes to `data_small/`): put `--config config/simulation.small.yaml` before the subcommand, e.g. `treasury-sim --config config/simulation.small.yaml backfill`. `export-all` rebuilds the Excel workbook, CSVs (`data_small/exports/`) and `docs/dataset/`; it runs automatically after backfill and during stream. Tests against it: `TREASURY_CONFIG=config/simulation.small.yaml .venv/bin/pytest`.
 - Views: `.venv/bin/python -m treasury.analytics.views` re-applies every `vw_*` view after a rebuild (set `TREASURY_CONFIG` for the small profile). Score the anomaly rules: `python -m treasury.analytics.score_alerts`
 - Tests: `.venv/bin/pytest` (add `-m "not contract"` to skip the ~1 min full-size contract checks) · Lint: `.venv/bin/ruff check src tests`
 - The clean database is rebuilt from scratch (tables dropped and recreated) on every build.
